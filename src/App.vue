@@ -78,11 +78,12 @@ const handleToggleItemStatus = (index: number) => {
     <input type="text" :value="newItemText" @input="handleNewItemInput" @keyup.enter="handleAddNewItem">
   </label>
   <button @click="handleAddNewItem">{{ ITEM_ACTION_BUTTON_LABEL.ADD }}</button>
-  <ul>
+  <TransitionGroup tag="ul">
     <li v-for="(item, index) in itemsStore.items" :key="index" :ref="(el) => focusSelectedItem(el as Element | null)">
       <div v-if="selectedItemIndex === index">
         <div>
-          <input type="text" :value="selectedItemText" @input="handleSelectedItemInput">
+          <input type="text" :value="selectedItemText" @input="handleSelectedItemInput"
+            @keyup.enter="() => handleEditItem(index)" @keyup.esc="handleDeselectItem">
         </div>
         <button type="button" @click="() => handleEditItem(index)">{{ ITEM_ACTION_BUTTON_LABEL.SAVE }}</button>
         <button type="button" @click="handleDeselectItem">{{ ITEM_ACTION_BUTTON_LABEL.CANCEL }}</button>
@@ -97,11 +98,27 @@ const handleToggleItemStatus = (index: number) => {
         <button @click="() => handleRemoveItem(index)">{{ ITEM_ACTION_BUTTON_LABEL.REMOVE }}</button>
       </div>
     </li>
-  </ul>
+  </TransitionGroup>
 </template>
 
 <style scoped>
 .complete {
   text-decoration: line-through;
+}
+
+.v-move,
+.v-enter-active,
+.v-leave-active {
+  transition: all 0.5s ease;
+}
+
+.v-enter-from,
+.v-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.v-leave-active {
+  position: absolute;
 }
 </style>
