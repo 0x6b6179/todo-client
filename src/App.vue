@@ -1,120 +1,107 @@
 <script setup lang="ts">
-import { watch, ref } from "vue";
+import { ref } from "vue";
 import { useItemsStore } from "./stores/items";
 
-const itemsStore = useItemsStore();
 
 const HEADING = "Todo App";
 const ADD_ITEM_LABEL = "Add New Item";
 enum ITEM_ACTION_BUTTON_LABEL {
   ADD = "Add",
+  CANCEL = "Cancel",
   COMPLETE = "Complete",
   EDIT = "Edit",
   REMOVE = "Remove",
   RESET = "Reset",
+  SAVE = "Save"
 }
 
-const newItem = ref("");
-const selectedEditItemIndex = ref<number | undefined>();
-const selectedEditItemText = ref("");
-const selectedEditItemsRef = ref();
+const itemsStore = useItemsStore();
+const newItemText = ref("");
+const selectedItemIndex = ref(-1);
+const selectedItemText = ref("");
+
+const focusSelectedItem = (el: Element | null) => {
+  if (el?.querySelector("input")) {
+    (el.querySelector("input") as HTMLInputElement).focus();
+  }
+}
 
 const handleNewItemInput = (event: Event) => {
-  newItem.value = (event.target as HTMLInputElement).value;
-};
-const handleSelectedItemInput = (event: Event) => {
-  selectedEditItemText.value = (event.target as HTMLInputElement).value;
-};
-const handleAddNewItem = () => {
-  itemsStore.addItem(newItem.value);
-  newItem.value = "";
-};
-const handleToggleItem = (index: number) => {
-  itemsStore.toggleItem(index);
-};
-const handleRemoveItem = (index: number) => {
-  itemsStore.removeItem(index);
-};
-const handleSaveItem = (index: number) => {
-  itemsStore.editItem(index, selectedEditItemText.value);
-  selectedEditItemIndex.value = undefined;
-  selectedEditItemText.value = "";
-};
-const handleEditItem = (index: number) => {
-  selectedEditItemIndex.value = index;
-  selectedEditItemText.value = itemsStore.$state.items[index].text;
-};
+  newItemText.value = (event.target as HTMLInputElement).value;
+}
 
-watch([selectedEditItemIndex, selectedEditItemsRef], (indexes) => {
-  console.log({ indexes });
-  if (selectedEditItemIndex !== undefined) {
-    console.log(selectedEditItemsRef.value);
+const handleSelectedItemInput = (event: Event) => {
+  selectedItemText.value = (event.target as HTMLInputElement).value;
+}
+
+const handleAddNewItem = () => {
+  if (newItemText.value.length) {
+    itemsStore.addItem(newItemText.value);
+    newItemText.value = "";
   }
-});
+}
+
+const handleEditItem = (index: number) => {
+  if (selectedItemText.value.length) {
+    itemsStore.editItem(index, selectedItemText.value);
+    selectedItemIndex.value = -1;
+    selectedItemText.value = "";
+  }
+}
+
+const handleRemoveItem = (index: number) => {
+  if (index > -1) {
+    itemsStore.removeItem(index);
+  }
+}
+
+const handleSelectItem = (index: number) => {
+  selectedItemIndex.value = index;
+  selectedItemText.value = itemsStore.items[selectedItemIndex.value].text;
+}
+
+const handleDeselectItem = () => {
+  selectedItemIndex.value = -1;
+  selectedItemText.value = "";
+}
+
+const handleToggleItemStatus = (index: number) => {
+  itemsStore.toggleItem(index);
+}
+
 </script>
 
 <template>
   <h1>{{ HEADING }}</h1>
   <label>
     {{ ADD_ITEM_LABEL }}
-    <input
-      type="text"
-      :value="newItem"
-      @input="handleNewItemInput"
-      @keyup.enter="handleAddNewItem"
-    />
+    <input type="text" :value="newItemText" @input="handleNewItemInput" @keyup.enter="handleAddNewItem">
   </label>
   <button @click="handleAddNewItem">{{ ITEM_ACTION_BUTTON_LABEL.ADD }}</button>
   <ul>
-    <li v-for="(item, index) in itemsStore.items" :key="index">
-      <Transition mode="out-in">
-        <div v-if="selectedEditItemIndex === index">
-          <div>
-            <input
-              type="text"
-              ref="selectedEditItemsRef"
-              :value="itemsStore.$state.items[index].text"
-              @input="handleSelectedItemInput"
-              @keyup.enter="() => handleSaveItem(index)"
-              @keyup.esc="selectedEditItemIndex = undefined"
-            />
-          </div>
-          <button @click="() => handleSaveItem(index)">Save</button>
-          <button @click="selectedEditItemIndex = undefined">Cancel</button>
+    <li v-for="(item, index) in itemsStore.items" :key="index" :ref="(el) => focusSelectedItem(el as Element | null)">
+      <div v-if="selectedItemIndex === index">
+        <div>
+          <input type="text" :value="selectedItemText" @input="handleSelectedItemInput">
         </div>
-        <div v-else>
-          <div :class="{ completed: item.completed }">{{ item.text }}</div>
-          <button @click="() => handleToggleItem(index)">
-            {{
-              item.completed
-                ? ITEM_ACTION_BUTTON_LABEL.RESET
-                : ITEM_ACTION_BUTTON_LABEL.COMPLETE
-            }}
-          </button>
-          <button @click="() => handleEditItem(index)">
-            {{ ITEM_ACTION_BUTTON_LABEL.EDIT }}
-          </button>
-          <button @click="() => handleRemoveItem(index)">
-            {{ ITEM_ACTION_BUTTON_LABEL.REMOVE }}
-          </button>
-        </div>
-      </Transition>
+        <button type="button" @click="() => handleEditItem(index)">{{ ITEM_ACTION_BUTTON_LABEL.SAVE }}</button>
+        <button type="button" @click="handleDeselectItem">{{ ITEM_ACTION_BUTTON_LABEL.CANCEL }}</button>
+      </div>
+      <div v-else>
+        <div :class="{ complete: itemsStore.items[index].completed }">{{ item.text }}</div>
+        <button type="button" @click="() => handleToggleItemStatus(index)">
+          {{ ITEM_ACTION_BUTTON_LABEL.COMPLETE }}</button>
+        <button type="button" @click="() => handleSelectItem(index)">
+          {{ ITEM_ACTION_BUTTON_LABEL.EDIT }}
+        </button>
+        <button @click="() => handleRemoveItem(index)">{{ ITEM_ACTION_BUTTON_LABEL.REMOVE }}</button>
+      </div>
     </li>
   </ul>
 </template>
 
 <style scoped>
-.completed {
+.complete {
   text-decoration: line-through;
-}
-
-.v-enter-active,
-.v-leave-active {
-  transition: opacity 0.25s ease;
-}
-
-.v-enter-from,
-.v-leave-to {
-  opacity: 0;
 }
 </style>
