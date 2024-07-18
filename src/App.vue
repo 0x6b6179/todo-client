@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { nextTick, onMounted, ref, watchEffect } from "vue";
+import type { ComponentPublicInstance } from "vue";
 import { useItemsStore } from "./stores/items";
-
 
 const HEADING = "Todo App";
 const ADD_ITEM_LABEL = "Add New Item";
@@ -12,34 +12,45 @@ enum ITEM_ACTION_BUTTON_LABEL {
   EDIT = "Edit",
   REMOVE = "Remove",
   RESET = "Reset",
-  SAVE = "Save"
+  SAVE = "Save",
 }
 
 const itemsStore = useItemsStore();
 const newItemText = ref("");
 const selectedItemIndex = ref(-1);
 const selectedItemText = ref("");
+const itemListRef = ref();
 
 const focusSelectedItem = (el: Element | null) => {
   if (el?.querySelector("input")) {
     (el.querySelector("input") as HTMLInputElement).focus();
   }
-}
+};
 
 const handleNewItemInput = (event: Event) => {
   newItemText.value = (event.target as HTMLInputElement).value;
-}
+};
 
 const handleSelectedItemInput = (event: Event) => {
   selectedItemText.value = (event.target as HTMLInputElement).value;
-}
+};
 
 const handleAddNewItem = () => {
   if (newItemText.value.length) {
     itemsStore.addItem(newItemText.value);
     newItemText.value = "";
+
+    nextTick().then(() => {
+      const newItemNode = (
+        itemListRef.value as ComponentPublicInstance
+      ).$el.querySelector("li:last-child");
+      newItemNode.addEventListener("dragstart", () =>
+        handleDragStart(newItemNode),
+      );
+      newItemNode.addEventListener("dragend", () => handleDragEnd(newItemNode));
+    });
   }
-}
+};
 
 const handleEditItem = (index: number) => {
   if (selectedItemText.value.length) {
@@ -47,55 +58,147 @@ const handleEditItem = (index: number) => {
     selectedItemIndex.value = -1;
     selectedItemText.value = "";
   }
-}
+};
 
 const handleRemoveItem = (index: number) => {
   if (index > -1) {
     itemsStore.removeItem(index);
   }
-}
+};
 
 const handleSelectItem = (index: number) => {
   selectedItemIndex.value = index;
   selectedItemText.value = itemsStore.items[selectedItemIndex.value].text;
-}
+};
 
 const handleDeselectItem = () => {
   selectedItemIndex.value = -1;
   selectedItemText.value = "";
-}
+};
 
 const handleToggleItemStatus = (index: number) => {
   itemsStore.toggleItem(index);
-}
+};
 
+const handleDragStart = (item: HTMLLIElement) => {
+  setTimeout(() => item.classList.add("dragging"), 0);
+};
+
+const handleDragEnd = (item: HTMLLIElement) => {
+  const removeDraggingClass = () => item.classList.remove("dragging");
+  setTimeout(removeDraggingClass, 0);
+};
+
+const handleDragOver = (event: MouseEvent) => {
+  event.preventDefault();
+
+  const findNextSibling = (sibling: unknown) => {
+    return (
+      event.clientY <=
+      (sibling as HTMLLIElement).offsetTop +
+        (sibling as HTMLLIElement).offsetHeight / 2
+    );
+  };
+
+  const itemList =
+    itemListRef &&
+    itemListRef.value &&
+    (itemListRef.value as ComponentPublicInstance).$el;
+
+  const draggingItem =
+    itemList && (itemList as HTMLLIElement).querySelector(".dragging");
+
+  if (draggingItem) {
+    const siblings = Array.from(
+      (
+        itemListRef.value as unknown as ComponentPublicInstance
+      ).$el.querySelectorAll("li:not(.dragging)"),
+    );
+    (itemList as HTMLLIElement).insertBefore(
+      draggingItem,
+      (siblings.find(findNextSibling) as Node) || null,
+    );
+  }
+};
+
+const handleDragEnter = (event: Event) => {
+  event.preventDefault();
+};
+
+onMounted(() => {
+  (itemListRef.value as ComponentPublicInstance).$el.addEventListener(
+    "dragover",
+    handleDragOver,
+  );
+  (itemListRef.value as ComponentPublicInstance).$el.addEventListener(
+    "dragenter",
+    handleDragEnter,
+  );
+});
+
+watchEffect(async () => {
+  if (itemListRef.value) {
+    itemListRef &&
+      itemListRef.value &&
+      (itemListRef.value as ComponentPublicInstance).$el
+        .querySelectorAll("li")
+        ?.forEach((item: HTMLLIElement) => {
+          item.addEventListener("dragstart", () => handleDragStart(item));
+          item.addEventListener("dragend", () => handleDragEnd(item));
+        });
+  }
+});
 </script>
 
 <template>
   <h1>{{ HEADING }}</h1>
   <label>
     {{ ADD_ITEM_LABEL }}
-    <input type="text" :value="newItemText" @input="handleNewItemInput" @keyup.enter="handleAddNewItem">
+    <input
+      type="text"
+      :value="newItemText"
+      @input="handleNewItemInput"
+      @keyup.enter="handleAddNewItem"
+    />
   </label>
   <button @click="handleAddNewItem">{{ ITEM_ACTION_BUTTON_LABEL.ADD }}</button>
-  <TransitionGroup tag="ul">
-    <li v-for="(item, index) in itemsStore.items" :key="index" :ref="(el) => focusSelectedItem(el as Element | null)">
+  <TransitionGroup tag="ul" ref="itemListRef" class="item-list">
+    <li
+      v-for="(item, index) in itemsStore.items"
+      :key="index"
+      :ref="(el) => focusSelectedItem(el as Element | null)"
+      draggable="true"
+    >
       <div v-if="selectedItemIndex === index">
         <div>
-          <input type="text" :value="selectedItemText" @input="handleSelectedItemInput"
-            @keyup.enter="() => handleEditItem(index)" @keyup.esc="handleDeselectItem">
+          <input
+            type="text"
+            :value="selectedItemText"
+            @input="handleSelectedItemInput"
+            @keyup.enter="() => handleEditItem(index)"
+            @keyup.esc="handleDeselectItem"
+          />
         </div>
-        <button type="button" @click="() => handleEditItem(index)">{{ ITEM_ACTION_BUTTON_LABEL.SAVE }}</button>
-        <button type="button" @click="handleDeselectItem">{{ ITEM_ACTION_BUTTON_LABEL.CANCEL }}</button>
+        <button type="button" @click="() => handleEditItem(index)">
+          {{ ITEM_ACTION_BUTTON_LABEL.SAVE }}
+        </button>
+        <button type="button" @click="handleDeselectItem">
+          {{ ITEM_ACTION_BUTTON_LABEL.CANCEL }}
+        </button>
       </div>
       <div v-else>
-        <div :class="{ complete: itemsStore.items[index].completed }">{{ item.text }}</div>
+        <div :class="{ complete: itemsStore.items[index].completed }">
+          {{ item.text }}
+        </div>
         <button type="button" @click="() => handleToggleItemStatus(index)">
-          {{ ITEM_ACTION_BUTTON_LABEL.COMPLETE }}</button>
+          {{ ITEM_ACTION_BUTTON_LABEL.COMPLETE }}
+        </button>
         <button type="button" @click="() => handleSelectItem(index)">
           {{ ITEM_ACTION_BUTTON_LABEL.EDIT }}
         </button>
-        <button @click="() => handleRemoveItem(index)">{{ ITEM_ACTION_BUTTON_LABEL.REMOVE }}</button>
+        <button @click="() => handleRemoveItem(index)">
+          {{ ITEM_ACTION_BUTTON_LABEL.REMOVE }}
+        </button>
       </div>
     </li>
   </TransitionGroup>
