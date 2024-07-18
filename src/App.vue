@@ -162,44 +162,46 @@ watchEffect(async () => {
     />
   </label>
   <button @click="handleAddNewItem">{{ ITEM_ACTION_BUTTON_LABEL.ADD }}</button>
-  <TransitionGroup tag="ul" ref="itemListRef" class="item-list">
+  <TransitionGroup tag="ul" ref="itemListRef" class="item-list" name="list">
     <li
       v-for="(item, index) in itemsStore.items"
       :key="index"
       :ref="(el) => focusSelectedItem(el as Element | null)"
       draggable="true"
     >
-      <div v-if="selectedItemIndex === index">
-        <div>
-          <input
-            type="text"
-            :value="selectedItemText"
-            @input="handleSelectedItemInput"
-            @keyup.enter="() => handleEditItem(index)"
-            @keyup.esc="handleDeselectItem"
-          />
+      <TransitionGroup name="list-item">
+        <div v-if="selectedItemIndex === index">
+          <div>
+            <input
+              type="text"
+              :value="selectedItemText"
+              @input="handleSelectedItemInput"
+              @keyup.enter="() => handleEditItem(index)"
+              @keyup.esc="handleDeselectItem"
+            />
+          </div>
+          <button type="button" @click="() => handleEditItem(index)">
+            {{ ITEM_ACTION_BUTTON_LABEL.SAVE }}
+          </button>
+          <button type="button" @click="handleDeselectItem">
+            {{ ITEM_ACTION_BUTTON_LABEL.CANCEL }}
+          </button>
         </div>
-        <button type="button" @click="() => handleEditItem(index)">
-          {{ ITEM_ACTION_BUTTON_LABEL.SAVE }}
-        </button>
-        <button type="button" @click="handleDeselectItem">
-          {{ ITEM_ACTION_BUTTON_LABEL.CANCEL }}
-        </button>
-      </div>
-      <div v-else>
-        <div :class="{ complete: itemsStore.items[index].completed }">
-          {{ item.text }}
+        <div v-else>
+          <div :class="{ complete: itemsStore.items[index].completed }">
+            {{ item.text }}
+          </div>
+          <button type="button" @click="() => handleToggleItemStatus(index)">
+            {{ ITEM_ACTION_BUTTON_LABEL.COMPLETE }}
+          </button>
+          <button type="button" @click="() => handleSelectItem(index)">
+            {{ ITEM_ACTION_BUTTON_LABEL.EDIT }}
+          </button>
+          <button @click="() => handleRemoveItem(index)">
+            {{ ITEM_ACTION_BUTTON_LABEL.REMOVE }}
+          </button>
         </div>
-        <button type="button" @click="() => handleToggleItemStatus(index)">
-          {{ ITEM_ACTION_BUTTON_LABEL.COMPLETE }}
-        </button>
-        <button type="button" @click="() => handleSelectItem(index)">
-          {{ ITEM_ACTION_BUTTON_LABEL.EDIT }}
-        </button>
-        <button @click="() => handleRemoveItem(index)">
-          {{ ITEM_ACTION_BUTTON_LABEL.REMOVE }}
-        </button>
-      </div>
+      </TransitionGroup>
     </li>
   </TransitionGroup>
 </template>
@@ -209,19 +211,39 @@ watchEffect(async () => {
   text-decoration: line-through;
 }
 
-.v-move,
-.v-enter-active,
-.v-leave-active {
+.list-move,
+.list-enter-active,
+.list-leave-active {
   transition: all 0.5s ease;
 }
 
-.v-enter-from,
-.v-leave-to {
+.list-enter-from,
+.list-leave-to {
   opacity: 0;
   transform: translateX(30px);
 }
 
-.v-leave-active {
+.list-leave-active {
+  position: absolute;
+}
+
+.list-item-move,
+.list-item-enter-active,
+.list-item-leave-active {
+  transition: all 0.5s ease;
+}
+
+.list-item-enter-from {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.list-item-leave-to {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+
+.list-item-leave-active {
   position: absolute;
 }
 </style>
